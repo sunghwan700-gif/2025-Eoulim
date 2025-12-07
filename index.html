@@ -1,13 +1,813 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>2025-eoulim</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ 전기과 기초 계산기 (GPT-4o 전제)</title>
+    
+    <style>
+        /* (CSS 부분 수정) */
+        /* 기본 리셋 및 폰트 설정 */
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', 'Nanum Gothic', sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 { margin: 0; font-size: 1.5em; }
+        .tabs { display: flex; justify-content: space-around; background-color: #e9ecef; border-bottom: 2px solid #ced4da; }
+        .tab-btn { flex-grow: 1; padding: 15px 10px; border: none; background-color: transparent; cursor: pointer; font-size: 1em; font-weight: 600; transition: background-color 0.3s, color 0.3s; }
+        .tab-btn.active { background-color: white; color: #007bff; border-bottom: 3px solid #007bff; }
+        main { padding: 20px; }
+        .tab-content { display: none; padding: 15px; background-color: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); }
+        .tab-content.active { display: block; }
+        h2 { color: #007bff; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; margin-top: 0; }
+
+        /* 폼 및 버튼 스타일 */
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-weight: 600; }
+        input[type="number"], select { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; font-size: 1em; }
+        .calculate-btn { width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-size: 1.1em; cursor: pointer; transition: background-color 0.3s; margin-bottom: 15px; }
+        .calculate-btn:hover { background-color: #218838; }
+
+        /* 저항 색띠 스타일 */
+        .resistor-type-selector { margin-bottom: 20px; display: flex; gap: 20px; justify-content: center; }
+        .input-group-resistor { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .resistor-band-select { flex: 1 1 45%; min-width: 120px; }
+        .resistor-visualizer { display: flex; justify-content: center; align-items: center; margin: 30px 0; }
+        
+        /* 저항 본체 크기 원복: 300px, 60px */
+        .resistor-body { 
+            width: 300px; 
+            height: 60px; 
+            background-color: #c79f8b; 
+            border-radius: 25px; 
+            display: flex; 
+            align-items: center; 
+            padding: 0 15px; 
+            position: relative; 
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2); 
+        }
+        /* 리드선 길이만 줄임: 30px -> 15px, 두께 3px -> 2px */
+        .resistor-body::before, .resistor-body::after { 
+            content: ''; 
+            position: absolute; 
+            width: 15px; /* 리드선 길이 조정 */
+            height: 2px; /* 리드선 두께 조정 */
+            background-color: #777; 
+            top: 50%; 
+            transform: translateY(-50%); 
+        }
+        .resistor-body::before { left: -15px; }
+        .resistor-body::after { right: -15px; }
+        
+        /* 띠 크기 원복: 50px, 10px */
+        .band { 
+            width: 10px; 
+            height: 50px; 
+            border-radius: 2px; 
+            margin: 0 5px; /* 띠 간격 조정 */
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); 
+            opacity: 0; 
+            transition: all 0.3s; 
+        }
+        .band.active { opacity: 1; }
+        #band1 { margin-left: 0; }
+        .resistor-body.five-band #band5 { margin-right: 0; margin-left: 15px; /* 5색띠 오차띠 위치 조정 */ } 
+        .resistor-body:not(.five-band) #band4 { margin-right: 0; margin-left: 15px; /* 4색띠 오차띠 위치 조정 */ }
+
+        /* 색상 클래스는 기존과 동일 */
+        .black { background-color: black; }
+        .brown { background-color: brown; }
+        .red { background-color: red; }
+        .orange { background-color: orange; }
+        .yellow { background-color: yellow; }
+        .green { background-color: green; }
+        .blue { background-color: blue; }
+        .violet { background-color: violet; }
+        .gray { background-color: gray; }
+        .white { background-color: white; }
+        .gold { background-color: gold; }
+        .silver { background-color: silver; }
+
+        /* 챗봇 스타일은 기존과 동일 */
+        .chatbot-container-wrapper {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background-color: #fffbe5; /* 연한 노란색 */
+            margin-top: 20px;
+        }
+        .chatbot-container {
+            padding: 10px;
+            max-height: 250px; 
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message { 
+            max-width: 80%; 
+            padding: 10px; 
+            border-radius: 15px; 
+            font-size: 1.1em; /* 글씨 크기 확대 */
+            line-height: 1.4; 
+        }
+        .user-message { align-self: flex-end; background-color: #dcf8c6; border-bottom-right-radius: 2px; color: #1f2d3d; }
+        .bot-message { align-self: flex-start; background-color: #e2f0fb; border-bottom-left-radius: 2px; color: #0056b3; animation: fadeIn 0.5s ease-out; }
+        .bot-message strong { 
+            display: block; 
+            margin-bottom: 5px; 
+            font-size: 1.15em; /* 중요 텍스트 크기 조정 */
+        }
+        .error-message { background-color: #f8d7da; color: #721c24; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 챗봇 검색 입력창 스타일은 기존과 동일 */
+        .chatbot-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #eee;
+        }
+
+        .chatbot-input input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        .chatbot-input button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .chatbot-input button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+    </head>
+<body>
+    <header>
+        <h1>⚡ 전기과 기초 계산기</h1>
+    </header>
+    
+    <nav class="tabs">
+        <button class="tab-btn active" data-tab="ohm">옴의 법칙</button>
+        <button class="tab-btn" data-tab="power">전력 계산</button>
+        <button class="tab-btn" data-tab="resistor">저항 색띠</button>
+    </nav>
+
+    <main id="app-container">
+        <section id="ohm" class="tab-content active">
+            <h2>옴의 법칙 (V, I, R)</h2>
+            <p>두 값을 입력하고 계산 버튼을 눌러보세요.</p>
+            <form id="ohm-form">
+                <div class="input-group">
+                    <label for="ohm-v">전압 (V)</label>
+                    <input type="number" id="ohm-v" placeholder="볼트 (V)" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="ohm-i">전류 (I)</label>
+                    <input type="number" id="ohm-i" placeholder="암페어 (A)" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="ohm-r">저항 (R)</label>
+                    <input type="number" id="ohm-r" placeholder="옴 (Ω)" min="0">
+                </div>
+                <button type="submit" class="calculate-btn">계산 및 피드백 받기</button>
+            </form>
+            <div class="chatbot-container-wrapper">
+                <div id="ohm-chatbot" class="chatbot-container"></div>
+                <div class="chatbot-input">
+                    <input type="text" id="ohm-search-input" placeholder="전기와 관련된 궁금한 점을 자유롭게 검색하세요. (예: 12V, 4옴 -> I는?)">
+                    <button onclick="handleSearch('ohm')">검색</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="power" class="tab-content">
+            <h2>전력 계산 (P)</h2>
+            <p>두 값을 입력하고 계산 버튼을 눌러보세요.</p>
+            <form id="power-form">
+                <div class="input-group">
+                    <label for="power-v">전압 (V)</label>
+                    <input type="number" id="power-v" placeholder="볼트 (V)" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="power-i">전류 (I)</label>
+                    <input type="number" id="power-i" placeholder="암페어 (A)" min="0">
+                </div>
+                <div class="input-group">
+                    <label for="power-r">저항 (R)</label>
+                    <input type="number" id="power-r" placeholder="옴 (Ω)" min="0">
+                </div>
+                <button type="submit" class="calculate-btn">계산 및 피드백 받기</button>
+            </form>
+            <div class="chatbot-container-wrapper">
+                <div id="power-chatbot" class="chatbot-container"></div>
+                <div class="chatbot-input">
+                    <input type="text" id="power-search-input" placeholder="전기와 관련된 궁금한 점을 자유롭게 검색하세요. (예: 50W, 10V -> R은?)">
+                    <button onclick="handleSearch('power')">검색</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="resistor" class="tab-content">
+            <h2>저항 색띠 계산 (4색띠 vs 5색띠)</h2>
+            
+            <div class="resistor-type-selector">
+                <label>
+                    <input type="radio" name="band-type" value="4band" checked>
+                    4색띠 저항 (일반용)
+                </label>
+                <label>
+                    <input type="radio" name="band-type" value="5band">
+                    5색띠 저항 (정밀용)
+                </label>
+            </div>
+            
+
+            <div class="resistor-visualizer">
+                <div id="resistor-body" class="resistor-body">
+                    <div id="band1" class="band"></div>
+                    <div id="band2" class="band"></div>
+                    <div id="band3" class="band"></div>
+                    <div id="band4" class="band"></div>
+                    <div id="band5" class="band"></div>
+                </div>
+            </div>
+
+            <form id="resistor-form">
+                <div class="input-group-resistor" id="resistor-inputs">
+                    </div>
+            </form>
+            <button type="button" class="calculate-btn" onclick="calculateResistance(true)">색띠 계산 및 결과 확인</button>
+            <div class="chatbot-container-wrapper">
+                <div id="resistor-chatbot" class="chatbot-container">
+                    </div>
+                <div class="chatbot-input">
+                    <input type="text" id="resistor-search-input" placeholder="저항 색상표 정보나 궁금한 점을 자유롭게 검색하세요.">
+                    <button onclick="handleSearch('resistor')">검색</button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <script>
+        // --- 전역 상수 및 설정 ---
+        const SEARCH_DATA = {
+            '옴': '옴(Ohm)은 전기 저항의 단위(Ω)입니다. 회로에서 전류의 흐름을 방해하는 정도를 나타냅니다.',
+            '전압': '전압(Voltage, V)은 전기 회로의 두 지점 사이의 전위차입니다. 전류를 흐르게 하는 힘입니다.',
+            '전류': '전류(Current, I)는 전하의 흐름입니다. 단위는 암페어(A)입니다.',
+            '저항': '저항(Resistance, R)은 도체가 전류의 흐름을 방해하는 정도입니다. 단위는 옴(Ω)입니다.',
+            '전력': '전력(Power, P)은 단위 시간당 소비되는 전기 에너지의 양입니다. 단위는 와트(W)입니다.',
+            '와트': '와트(Watt, W)는 전력의 단위입니다. 1W는 1초 동안 1줄(J)의 에너지를 소비하는 것을 의미합니다.',
+            '색띠': '저항의 색띠는 저항값, 승수(곱하는 값), 허용 오차를 나타냅니다. 4색띠는 일반용, 5색띠는 정밀용입니다.',
+            '허용 오차': '허용 오차(Tolerance)는 저항값의 실제 측정값이 표기된 값과 다를 수 있는 범위(%)를 의미합니다.',
+            '주파수': '주파수(Frequency)는 교류(AC)에서 전기의 방향이 초당 바뀌는 횟수입니다. 단위는 헤르츠(Hz)입니다.',
+        };
+        
+        const CALC_UNITS = {
+            'V': ['v', '볼트', '전압'],
+            'I': ['a', '암페어', '전류'],
+            'R': ['r', '옴', 'Ω', '저항'],
+            'P': ['w', '와트', '전력']
+        };
+
+
+        // --- DOMContentLoaded 및 초기화 로직 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const bandTypeSelectors = document.querySelectorAll('input[name="band-type"]');
+
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetTab = button.dataset.tab;
+
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+
+                    tabContents.forEach(content => {
+                        content.classList.remove('active');
+                        if (content.id === targetTab) {
+                            content.classList.add('active');
+                            if (targetTab === 'resistor') {
+                                // 탭이 변경될 때만 초기화
+                                setupResistorCalculator(false); 
+                            }
+                        }
+                    });
+                });
+            });
+
+            bandTypeSelectors.forEach(selector => {
+                selector.addEventListener('change', () => {
+                    if (document.getElementById('resistor').classList.contains('active')) {
+                        // 저항 유형 변경 시 계산기 재설정 및 메시지 출력
+                        setupResistorCalculator(true); 
+                        const bandType = document.querySelector('input[name="band-type"]:checked').value;
+                        const chatbot = document.getElementById('resistor-chatbot');
+                        addBotMessage(chatbot, `저항 유형을 **${bandType === '4band' ? '4색띠 저항' : '5색띠 저항'}**으로 변경했습니다. 색띠를 선택하고 '계산' 버튼을 눌러주세요.`, '저항 유형 변경');
+                    }
+                });
+            });
+
+            document.getElementById('ohm').classList.add('active');
+            // 초기 로드 시 저항 계산기는 메시지 없이 시각화만 설정
+            setupResistorCalculator(false); 
+        });
+
+        // --- 챗봇 메시지 추가 유틸리티 ---
+        function addMessage(container, message, type) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', `${type}-message`);
+            messageElement.innerHTML = message;
+            container.appendChild(messageElement);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addUserMessage(container, inputSummary) {
+            addMessage(container, `입력값: ${inputSummary}`, 'user');
+        }
+
+        function addBotMessage(container, resultHTML, feedbackText) {
+            const message = `<strong>✅ ${resultHTML.includes('오류') ? '오류 메시지' : '계산 결과'}</strong>${resultHTML}<br><br>${feedbackText}`;
+            addMessage(container, message, 'bot');
+        }
+        
+        function addErrorMessage(container, message) {
+            addMessage(container, `❌ 오류: ${message}`, 'error');
+        }
+
+        // --- 단위 변환 유틸리티 함수 ---
+        function formatUnit(value, unit) {
+            const absValue = Math.abs(value);
+
+            if (absValue >= 1e6) {
+                return `${(value / 1e6).toFixed(3).replace(/\.0+$/, '')} M${unit}`;
+            } else if (absValue >= 1e3) {
+                return `${(value / 1e3).toFixed(3).replace(/\.0+$/, '')} k${unit}`;
+            } else if (absValue < 1 && absValue > 0.001) {
+                return `${(value * 1e3).toFixed(3).replace(/\.0+$/, '')} m${unit}`;
+            }
+            return `${value.toFixed(3).replace(/\.0+$/, '')} ${unit}`;
+        }
+
+        // --- 계산 문제 해결 함수 (강화된 로직 - 기존과 동일) ---
+        function solveElectricalProblem(query) {
+            const cleanedQuery = query.toLowerCase()
+                .replace(/(\s*=\s*|\s*일때|\s*때|\s*면|\s*이면)/g, ' ') 
+                .replace(/[,\(\)]/g, '')
+                .replace(/(\s+이\s+|\s+가\s+|\s+은\s+|\s+는\s+)/g, ' ');
+
+            let values = {};
+            let required = null;
+
+            const valueRegex = /(\d+(\.\d+)?)\s*(v|볼트|전압|a|암페어|전류|r|옴|Ω|저항|w|와트|전력)/ig;
+            let match;
+
+            while ((match = valueRegex.exec(cleanedQuery)) !== null) {
+                const val = parseFloat(match[1]);
+                const matchedUnit = match[3].toLowerCase();
+
+                if (CALC_UNITS.V.some(u => matchedUnit.includes(u))) values['V'] = val;
+                else if (CALC_UNITS.I.some(u => matchedUnit.includes(u))) values['I'] = val;
+                else if (CALC_UNITS.R.some(u => matchedUnit.includes(u))) values['R'] = val;
+                else if (CALC_UNITS.P.some(u => matchedUnit.includes(u))) values['P'] = val;
+            }
+
+            if (cleanedQuery.includes('전류는') || cleanedQuery.includes('i는') || cleanedQuery.includes('a는') || cleanedQuery.includes('전류가') || cleanedQuery.includes('i가') || cleanedQuery.includes('전류값은')) required = 'I';
+            else if (cleanedQuery.includes('전압은') || cleanedQuery.includes('v는') || cleanedQuery.includes('전압이') || cleanedQuery.includes('v가') || cleanedQuery.includes('전압값은')) required = 'V';
+            else if (cleanedQuery.includes('저항은') || cleanedQuery.includes('r은') || cleanedQuery.includes('옴은') || cleanedQuery.includes('저항이') || cleanedQuery.includes('r가') || cleanedQuery.includes('저항값은')) required = 'R';
+            else if (cleanedQuery.includes('전력은') || cleanedQuery.includes('p는') || cleanedQuery.includes('w는') || cleanedQuery.includes('전력이') || cleanedQuery.includes('p가') || cleanedQuery.includes('전력값은')) required = 'P';
+
+            if (!required || Object.keys(values).length < 2) {
+                return { success: false }; 
+            }
+
+            const { V, I, R, P } = values;
+            let resultValue = null;
+            let resultUnit = null;
+            let formula = '';
+
+            const keys = Object.keys(values);
+
+            if (required === 'V' && keys.length === 2) {
+                if (I !== undefined && R !== undefined) {
+                    resultValue = I * R; formula = 'V = I × R'; resultUnit = 'V';
+                } else if (P !== undefined && I !== undefined && I !== 0) {
+                    resultValue = P / I; formula = 'V = P / I'; resultUnit = 'V';
+                } else if (P !== undefined && R !== undefined && R >= 0) {
+                    resultValue = Math.sqrt(P * R); formula = 'V = √(P × R)'; resultUnit = 'V';
+                }
+            } 
+            else if (required === 'I' && keys.length === 2) {
+                if (V !== undefined && R !== undefined && R !== 0) {
+                    resultValue = V / R; formula = 'I = V / R'; resultUnit = 'A';
+                } else if (P !== undefined && V !== undefined && V !== 0) {
+                    resultValue = P / V; formula = 'I = P / V'; resultUnit = 'A';
+                } else if (P !== undefined && R !== undefined && R !== 0) {
+                    resultValue = Math.sqrt(P / R); formula = 'I = √(P / R)'; resultUnit = 'A';
+                }
+            } 
+            else if (required === 'R' && keys.length === 2) {
+                if (V !== undefined && I !== undefined && I !== 0) {
+                    resultValue = V / I; formula = 'R = V / I'; resultUnit = 'Ω';
+                } else if (V !== undefined && P !== undefined && P !== 0) {
+                    resultValue = (V * V) / P; formula = 'R = V² / P'; resultUnit = 'Ω';
+                } else if (I !== undefined && P !== undefined && I !== 0) {
+                    resultValue = P / (I * I); formula = 'R = P / I²'; resultUnit = 'Ω';
+                }
+            } 
+            else if (required === 'P' && keys.length === 2) {
+                if (V !== undefined && I !== undefined) {
+                    resultValue = V * I; formula = 'P = V × I'; resultUnit = 'W';
+                } else if (I !== undefined && R !== undefined) {
+                    resultValue = I * I * R; formula = 'P = I² × R'; resultUnit = 'W';
+                } else if (V !== undefined && R !== undefined && R !== 0) {
+                    resultValue = (V * V) / R; formula = 'P = V² / R'; resultUnit = 'W';
+                }
+            }
+
+            if (resultValue !== null && !isNaN(resultValue) && isFinite(resultValue) && resultValue >= 0) {
+                let inputSummary = Object.keys(values).map(key => {
+                    let unit;
+                    if (key === 'V') unit = 'V'; else if (key === 'I') unit = 'A';
+                    else if (key === 'R') unit = 'Ω'; else if (key === 'P') unit = 'W';
+                    return `${key} = ${values[key]} ${unit}`;
+                }).join(', ');
+                
+                const formattedResult = `${required} 값: **${formatUnit(resultValue, resultUnit)}**`;
+                const feedback = `검색하신 정보를 바탕으로 ${required} 값을 계산했습니다.`;
+
+                return { 
+                    success: true, 
+                    resultHTML: `${formattedResult} (공식: ${formula})`, 
+                    feedback: feedback, 
+                    inputSummary: `입력값: ${inputSummary}`,
+                };
+            }
+
+            return { success: false };
+        }
+
+        // --- 검색 핸들러 함수 (기존과 동일) ---
+        function handleSearch(tabId) {
+            const inputElement = document.getElementById(`${tabId}-search-input`);
+            const chatbot = document.getElementById(`${tabId}-chatbot`);
+            const query = inputElement.value.trim();
+
+            if (!query) return;
+
+            addMessage(chatbot, query, 'user');
+
+            const calculationResult = solveElectricalProblem(query);
+
+            if (calculationResult.success) {
+                addBotMessage(chatbot, calculationResult.resultHTML, calculationResult.feedback);
+            } else {
+                let found = false;
+                let response = '';
+                const lowerQuery = query.toLowerCase();
+
+                for (const [keyword, definition] of Object.entries(SEARCH_DATA)) {
+                    if (lowerQuery.includes(keyword) || keyword.includes(lowerQuery)) {
+                        response = `**🔎 ${keyword.charAt(0).toUpperCase() + keyword.slice(1)} (기본 정보)**<br>${definition}`;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    response = `**"${query}"**에 대한 기본 정보가 없습니다. GPT-4o 모델을 통해 외부 검색 엔진 및 유튜브 영상을 탐색하여 상세 정보를 찾아 드릴게요!`;
+                }
+
+                addMessage(chatbot, response, found ? 'bot' : 'error');
+            }
+
+            inputElement.value = '';
+        }
+
+        // --- 1. 옴의 법칙 계산기 로직 (기존과 동일) ---
+        document.getElementById('ohm-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const V = parseFloat(document.getElementById('ohm-v').value);
+            const I = parseFloat(document.getElementById('ohm-i').value);
+            const R = parseFloat(document.getElementById('ohm-r').value);
+            const chatbot = document.getElementById('ohm-chatbot');
+            
+            const inputs = [V, I, R].filter(val => !isNaN(val) && val >= 0);
+
+            if (inputs.length !== 2) {
+                addErrorMessage(chatbot, '정확히 두 개의 양수 값을 입력해야 합니다.');
+                return;
+            }
+
+            let resultValue = 0;
+            let resultUnit = '';
+            let calculatedType = '';
+            let feedback = '';
+            let inputSummary = '';
+            let formula = '';
+
+            if (!isNaN(V) && !isNaN(I) && isNaN(R)) {
+                if (I === 0) { addErrorMessage(chatbot, '전류(I)는 0일 수 없습니다 (0으로 나누기 오류).'); return; }
+                resultValue = V / I;
+                resultUnit = 'Ω';
+                calculatedType = '저항 (R)';
+                formula = 'R = V / I';
+                inputSummary = `V = ${V} V, I = ${I} A`;
+                feedback = '입력한 전압과 전류로 회로가 가질 저항값을 계산했습니다. **저항은 전류의 흐름을 방해**하는 요소입니다.';
+            } 
+            else if (!isNaN(V) && isNaN(I) && !isNaN(R)) {
+                if (R === 0) { addErrorMessage(chatbot, '저항(R)은 0일 수 없습니다 (0으로 나누기 오류).'); return; }
+                resultValue = V / R;
+                resultUnit = 'A';
+                calculatedType = '전류 (I)';
+                formula = 'I = V / R';
+                inputSummary = `V = ${V} V, R = ${R} Ω`;
+                feedback = '입력한 전압과 저항값으로 회로에 흐를 전류를 계산했습니다. **전류가 너무 높으면** 회로가 손상될 수 있습니다.';
+            } 
+            else if (isNaN(V) && !isNaN(I) && !isNaN(R)) {
+                resultValue = I * R;
+                resultUnit = 'V';
+                calculatedType = '전압 (V)';
+                formula = 'V = I × R';
+                inputSummary = `I = ${I} A, R = ${R} Ω`;
+                feedback = '입력한 전류와 저항값을 유지하는 데 필요한 전압을 계산했습니다. **전압은 전류를 흐르게 하는 힘**입니다.';
+            } else {
+                addErrorMessage(chatbot, '잘못된 입력입니다. 두 개의 값을 확인해주세요.');
+                return;
+            }
+            
+            const formattedResult = `${calculatedType} = **${formatUnit(resultValue, resultUnit)}** (공식: ${formula})`;
+            
+            addUserMessage(chatbot, inputSummary);
+            addBotMessage(chatbot, formattedResult, feedback);
+        });
+
+        // --- 2. 전력 계산기 로직 (기존과 동일) ---
+        document.getElementById('power-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const V = parseFloat(document.getElementById('power-v').value);
+            const I = parseFloat(document.getElementById('power-i').value);
+            const R = parseFloat(document.getElementById('power-r').value);
+            const chatbot = document.getElementById('power-chatbot');
+
+            const inputs = [V, I, R].filter(val => !isNaN(val) && val >= 0);
+
+            if (inputs.length !== 2) {
+                addErrorMessage(chatbot, '정확히 두 개의 양수 값을 입력해야 합니다.');
+                return;
+            }
+
+            let P = 0; 
+            let formula = '';
+            let feedback = '';
+            let inputSummary = '';
+
+            if (!isNaN(V) && !isNaN(I)) {
+                P = V * I;
+                formula = 'P = V × I';
+                inputSummary = `V = ${V} V, I = ${I} A`;
+                feedback = '전압과 전류를 이용해 소비 전력을 계산했습니다. **와트(W)는 에너지가 소비되는 속도**를 나타냅s니다.';
+            } 
+            else if (!isNaN(I) && !isNaN(R)) {
+                P = I * I * R;
+                formula = 'P = I² × R';
+                inputSummary = `I = ${I} A, R = ${R} Ω`;
+                feedback = '전류와 저항을 이용해 전력을 계산했습니다. 저항에 의해 **열로 소모되는 전력**을 계산할 때 유용합니다.';
+            } 
+            else if (!isNaN(V) && !isNaN(R)) {
+                if (R === 0) { addErrorMessage(chatbot, '저항(R)은 0일 수 없습니다.'); return; }
+                P = (V * V) / R;
+                formula = 'P = V² / R';
+                inputSummary = `V = ${V} V, R = ${R} Ω`;
+                feedback = '전압과 저항을 이용해 전력을 계산했습니다. **전원 전압이 고정된 경우**에 사용됩니다.';
+            }
+
+            const formattedResult = `소비 전력 (P) = **${formatUnit(P, 'W')}** (공식: ${formula})`;
+            
+            addUserMessage(chatbot, inputSummary);
+            addBotMessage(chatbot, formattedResult, feedback);
+        });
+
+
+        // --- 3. 저항 색띠 계산기 로직 (기존과 동일) ---
+        
+        const RESISTOR_CODES = {
+            'black': 0, 'brown': 1, 'red': 2, 'orange': 3, 'yellow': 4,
+            'green': 5, 'blue': 6, 'violet': 7, 'gray': 8, 'white': 9,
+            'multiplier': {
+                'black': 1, 'brown': 10, 'red': 100, 'orange': 1000, 
+                'yellow': 10000, 'green': 100000, 'blue': 1000000,
+                'gold': 0.1, 'silver': 0.01
+            },
+            'tolerance': {
+                'brown': 1, 'red': 2, 'green': 0.5, 'blue': 0.25,
+                'violet': 0.1, 'gray': 0.05, 'silver': 10, 'gold': 5
+            }
+        };
+
+        const VALUE_COLORS = ['black', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'violet', 'gray', 'white'];
+
+        const BANDS_4 = [
+            { id: 'band1', name: 'Band 1 (첫째)', type: 'value', colors: VALUE_COLORS.slice(1), default: 'brown' },
+            { id: 'band2', name: 'Band 2 (둘째)', type: 'value', colors: VALUE_COLORS, default: 'black' },
+            { id: 'band3', name: 'Band 3 (승수)', type: 'multiplier', colors: RESISTOR_CODES.multiplier, default: 'red' },
+            { id: 'band4', name: 'Band 4 (오차)', type: 'tolerance', colors: RESISTOR_CODES.tolerance, default: 'gold' }
+        ];
+
+        const BANDS_5 = [
+            { id: 'band1', name: 'Band 1 (첫째)', type: 'value', colors: VALUE_COLORS.slice(1), default: 'brown' }, 
+            { id: 'band2', name: 'Band 2 (둘째)', type: 'value', colors: VALUE_COLORS, default: 'black' },
+            { id: 'band3', name: 'Band 3 (셋째)', type: 'value', colors: VALUE_COLORS, default: 'black' },
+            { id: 'band4', name: 'Band 4 (승수)', type: 'multiplier', colors: RESISTOR_CODES.multiplier, default: 'red' },
+            { id: 'band5', name: 'Band 5 (오차)', type: 'tolerance', colors: RESISTOR_CODES.tolerance, default: 'brown' }
+        ];
+
+
+        function createSelect(band) {
+            const bandId = band.id;
+            const bandLabel = band.name;
+
+            let colorOptions = band.type === 'value' 
+                ? band.colors 
+                : Object.keys(band.colors);
+
+            // "none" 옵션을 추가하여 초기 "undefined" 메시지를 방지
+            let defaultOption = band.type === 'value' 
+                ? `<option value="none" disabled selected>색상 선택</option>`
+                : `<option value="none" disabled selected>색상 선택</option>`;
+            
+
+            const selectHtml = `
+                <div class="resistor-band-select">
+                    <label for="${bandId}-select">${bandLabel}</label>
+                    <select id="${bandId}-select" data-band-id="${bandId}" data-band-type="${band.type}">
+                        ${defaultOption}
+                        ${colorOptions.map(color => 
+                            `<option value="${color}" ${color === band.default ? 'selected' : ''}>${color.charAt(0).toUpperCase() + color.slice(1)}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+            `;
+            return selectHtml;
+        }
+
+        function updateVisualizer(bandId, color, isActive) {
+            const bandElement = document.getElementById(bandId);
+            // 'none' 값이 들어올 경우 색깔을 지정하지 않음
+            const colorClass = color !== 'none' ? color : '';
+            bandElement.className = `band ${colorClass} ${isActive ? 'active' : ''}`;
+        }
+
+        // isManualTrigger: 사용자가 버튼을 눌렀을 때만 챗봇 메시지를 출력하도록 플래그 추가
+        function calculateResistance(isManualTrigger = false) {
+            const bandType = document.querySelector('input[name="band-type"]:checked').value;
+            const bandDefinitions = bandType === '4band' ? BANDS_4 : BANDS_5;
+            const chatbot = document.getElementById('resistor-chatbot');
+            const colors = {};
+            let inputSummary = '';
+            let resistance = 0;
+            const resistorBody = document.getElementById('resistor-body');
+
+            resistorBody.className = `resistor-body ${bandType === '5band' ? 'five-band' : ''}`;
+
+            const selectElements = document.querySelectorAll('#resistor-inputs select');
+            
+            // 1. 선택된 색깔 저장 및 시각화 업데이트
+            let allBandsSelected = true;
+            selectElements.forEach(select => {
+                const color = select.value;
+                colors[select.dataset.bandId] = color;
+                
+                // 'none'을 선택했다면 계산을 진행하지 않음
+                if (color === 'none') {
+                    allBandsSelected = false;
+                }
+            });
+            
+            // 시각화는 선택 여부와 관계없이 업데이트
+            for(let i=1; i<=5; i++) {
+                const bandDef = bandDefinitions.find(d => d.id === `band${i}`);
+                const color = colors[`band${i}`];
+                updateVisualizer(`band${i}`, color || '', !!bandDef);
+            }
+
+            if (!allBandsSelected) {
+                if (isManualTrigger) {
+                    addErrorMessage(chatbot, '모든 색띠를 선택해야 저항값을 계산할 수 있습니다.');
+                }
+                return; // 필수 입력값이 없으면 계산 중단
+            }
+
+
+            // 2. 입력 요약 생성 (계산이 가능할 때만 실행)
+            bandDefinitions.forEach((bandDef) => {
+                const color = colors[bandDef.id];
+                const bandValue = color.charAt(0).toUpperCase() + color.slice(1);
+                inputSummary += `${bandDef.name.split('(')[0].trim()}: ${bandValue} | `;
+            });
+
+            // 3. 저항값 계산
+            const toleranceColor = colors[`band${bandDefinitions.length}`];
+            const multiplierColor = colors[`band${bandDefinitions.length - 1}`];
+            
+            const multiplier = RESISTOR_CODES.multiplier[multiplierColor];
+            const tolerance = RESISTOR_CODES.tolerance[toleranceColor];
+
+            if (bandType === '4band') {
+                const value1 = RESISTOR_CODES[colors.band1];
+                const value2 = RESISTOR_CODES[colors.band2];
+                resistance = (value1 * 10 + value2) * multiplier;
+            } else { // 5band
+                const value1 = RESISTOR_CODES[colors.band1];
+                const value2 = RESISTOR_CODES[colors.band2];
+                const value3 = RESISTOR_CODES[colors.band3];
+                resistance = (value1 * 100 + value2 * 10 + value3) * multiplier;
+            }
+
+            const toleranceValue = resistance * (tolerance / 100);
+            const minResistance = resistance - toleranceValue;
+            const maxResistance = resistance + toleranceValue;
+
+            const formattedR = formatUnit(resistance, 'Ω');
+            const formattedMin = formatUnit(minResistance, 'Ω');
+            const formattedMax = formatUnit(maxResistance, 'Ω');
+
+            const resultHTML = `
+                저항값: **${formattedR}** ± ${tolerance}%<br>
+                최소 범위: ${formattedMin}<br>
+                최대 범위: ${formattedMax}
+            `;
+            
+            const feedback = bandType === '5band' 
+                ? `선택한 **5색띠 (정밀 저항)**에 따른 계산 결과입니다. 3개의 유효 숫자가 사용되어 정밀도가 높습니다.`
+                : `선택한 **4색띠 저항**에 따른 계산 결과입니다. 2개의 유효 숫자가 사용되며 일반적인 용도에 사용됩니다.`;
+
+            // 4. 챗봇 메시지 출력 (수동으로 트리거되었을 때만)
+            if (isManualTrigger) {
+                addUserMessage(chatbot, inputSummary.trim());
+                addBotMessage(chatbot, resultHTML, feedback);
+            }
+        }
+
+        // setupResistorCalculator 함수 수정: 초기 메시지 출력을 제어하는 플래그 추가
+        function setupResistorCalculator(shouldOutputMessage) {
+            const resistorInputsDiv = document.getElementById('resistor-inputs');
+            const bandType = document.querySelector('input[name="band-type"]:checked').value;
+            const bandDefinitions = bandType === '4band' ? BANDS_4 : BANDS_5;
+            
+            resistorInputsDiv.innerHTML = '';
+            
+            let inputsHTML = '';
+            bandDefinitions.forEach(band => {
+                inputsHTML += createSelect(band);
+            });
+            resistorInputsDiv.innerHTML = inputsHTML;
+
+            // 폼 제출 버튼에 리스너 추가 (DOM이 새로 로드되므로 다시 바인딩)
+            document.querySelector('#resistor button.calculate-btn').onclick = () => calculateResistance(true);
+
+            // 드롭다운 변경 시 시각화만 즉시 업데이트 (계산 결과 메시지 X)
+            const selects = resistorInputsDiv.querySelectorAll('select');
+            selects.forEach(select => {
+                select.addEventListener('change', () => {
+                    // 계산은 실행하되, 챗봇 메시지 출력은 하지 않음 (시각화만 업데이트)
+                    calculateResistance(false); 
+                });
+            });
+            
+            // 초기 시각화 설정 (메시지 출력 X)
+            calculateResistance(false); 
+            
+            // 초기 안내 메시지는 탭이 로드될 때만 (shouldOutputMessage가 true일 때) 출력
+            if (shouldOutputMessage) {
+                 const chatbot = document.getElementById('resistor-chatbot');
+                 addBotMessage(chatbot, '새로운 저항 유형을 선택했습니다. 색띠를 선택하고 **"색띠 계산 및 결과 확인"** 버튼을 눌러주세요.', '준비 완료');
+            }
+        }
+    </script>
+    </body>
 </html>
